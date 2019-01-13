@@ -39,6 +39,7 @@ type gPlusPost struct {
 func main() {
 	in := flag.String("i", "", "infile JSON for posts (required)")
 	out := flag.String("o", "", "outfile for posts (required)")
+	retries := flag.Int("r", 5, "number of retries for failed GET")
 	flag.Parse()
 	if *in == "" || *out == "" {
 		flag.Usage()
@@ -90,9 +91,17 @@ func main() {
 		base := fmt.Sprintf("%s_%s", ctime.Format(time.RFC3339), path.Base(u.Path))
 		fmt.Println(base)
 
-		resp, err := http.Get(p.URL)
+		var resp *http.Response
+		for i := 0; i < *retries; i++ {
+			time.Sleep(time.Duration(1<<uint(i)-1) * time.MilliSecond)
+			resp, err = http.Get(p.URL)
+			if err == nil {
+				break
+			}
+			log.Printf("failed to GET %v: %v", p.URL, err)
+		}
 		if err != nil {
-			log.Fatalf("failed to GET %v: %v", p.URL, err)
+			continue
 		}
 
 		fh := &zip.FileHeader{
